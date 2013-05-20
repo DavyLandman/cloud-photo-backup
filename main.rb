@@ -38,9 +38,7 @@ class BackupJob
   end
 
   def finished?
-   r = IO.select([@running], nil, nil, 0);
-   puts r
-    r == nil
+    IO.select([@running], nil, nil, 0.1) and @running.eof?
   end
 end
 
@@ -54,8 +52,9 @@ backup_actions = createJobs(all, img_base_dir, target_dir)
 
 backup_actions.each do |a|
   a.start
+  puts "waiting for it to finish"
   while !a.finished?
-    sleep 100
+    sleep 0.1
     puts "waiting"
   end
 end
