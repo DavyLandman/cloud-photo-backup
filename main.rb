@@ -1,13 +1,5 @@
 require 'set'
-
-
-
-class BackupJob
-  def initialize(original, target)
-    @original = original
-    @target = target
-  end
-end
+require 'fileutils'
 
 def getImages(img_base_dir)
   puts "Checking input directory #{img_base_dir} for images to backup"
@@ -31,10 +23,41 @@ def createJobs(all, img_base_dir, target_dir)
   return backup_actions
 end
 
-img_base_dir = "/Users/davy/Pictures/"
-target_dir = "/Users/davy/Dropbox/Pictures Backup/"
+class BackupJob
+  def initialize(original, target)
+    @original = original
+    @target = target
+    @running = nil
+  end
+
+  def start
+    puts "From #{@original} to #{@target}"
+    dir = File.dirname(@target)
+    FileUtils.mkpath(dir)  unless File.directory?(dir)
+    @running ||= IO.popen("convert -resize 1800x1800 \"#{@original}\" \"#{@target}\"")
+  end
+
+  def finished?
+   r = IO.select([@running], nil, nil, 0);
+   puts r
+    r == nil
+  end
+end
+
+#img_base_dir = "/Users/davy/Pictures/"
+#target_dir = "/Users/davy/Dropbox/Pictures Backup/"
+img_base_dir = "input/"
+target_dir = "output/"
 
 all = getImages(img_base_dir)
 backup_actions = createJobs(all, img_base_dir, target_dir)
+
+backup_actions.each do |a|
+  a.start
+  while !a.finished?
+    sleep 100
+    puts "waiting"
+  end
+end
 
 puts "#{backup_actions.size} to actually backup"
