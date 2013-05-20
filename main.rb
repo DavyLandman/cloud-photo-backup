@@ -45,14 +45,15 @@ end
 
 def runJobs(jobs, split = 4)
   queue = Queue.new
-  completed = Queue.new
   jobs.each { |j| queue.push j }
 
 
   threads = []
+  progress = 0.0
 
   split.times do
     threads << Thread.new do
+      Thread.current['progress'] = 0
       # loop until there are no more things to do
       until queue.empty?
         # pop with the non-blocking flag set, this raises
@@ -65,27 +66,37 @@ def runJobs(jobs, split = 4)
           while !work_unit.finished?
             sleep 0.1
           end
-          completed << true
+          Thread.current['progress'] += 1
+          progress += 1
         end
       end
       # when there is no more work, the thread will stop
     end
   end
 
-  last = 0
-  show_progress = jobs.size / 25;
-  show_progress = 1 if show_progress == 0
-  STDOUT.sync = true
-  puts  "0%|#{(0..25).map{" "}}|100%"
-  print "   "
-  while completed.size < jobs.size 
-    step = completed.size % show_progress 
-    print "o" if step > last
-    last = step
-    sleep 0.5
+  
+  threads << Thread.new do
+    last = 0
+    jobs_size = jobs.size
+    puts  "0%|#{(0..24).map{"_"}}|100%"
+    STDOUT.sync = true
+    print "   "
+    while progress <= jobs_size
+      step = (100 * (progress / jobs_size)).round / 4
+      while last < step
+        print "#"
+        last += 1
+      end
+      if last == 25
+        break
+      end
+      sleep 0.1
+    end
+    print "\n"
   end
 
   threads.each { |t| t.join }
+  puts "Finished"
 end
 
 #img_base_dir = "/Users/davy/Pictures/"
