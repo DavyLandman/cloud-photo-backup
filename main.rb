@@ -1,5 +1,6 @@
 require 'set'
 require 'fileutils'
+require 'thread'
 
 def getImages(img_base_dir)
   puts "Checking input directory #{img_base_dir} for images to backup"
@@ -33,12 +34,42 @@ class BackupJob
   def start
     dir = File.dirname(@target)
     FileUtils.mkpath(dir)  unless File.directory?(dir)
-    @running ||= IO.popen("convert -interlace Plane -quality 90 -resize 1800x1800 \"#{@original}\" \"#{@target}\"")
+    @running ||= IO.popen("convert -interlace Plane -quality 85 -resize 1800x1800 \"#{@original}\" \"#{@target}\"")
   end
 
   def finished?
     IO.select([@running], nil, nil, 0.1) and @running.eof?
   end
+end
+
+
+def runJobs(jobs, split = 4)
+  queue = Queue.new
+  jobs.each { |j| queue.push j }
+
+  threads = []
+
+  split.times do
+    threads << Thread.new do
+      # loop until there are no more things to do
+      until queue.empty?
+        # pop with the non-blocking flag set, this raises
+        # an exception if the queue is empty, in which case
+        # work_unit will be set to nil
+        work_unit = queue.pop(true) rescue nil
+        if work_unit
+          # do work
+          work_unit.start
+          while !work_unit.finished?
+            sleep 0.1
+          end
+        end
+      end
+      # when there is no more work, the thread will stop
+    end
+  end
+
+  threads.each { |t| t.join }
 end
 
 #img_base_dir = "/Users/davy/Pictures/"
@@ -50,10 +81,4 @@ all = getImages(img_base_dir)
 backup_actions = createJobs(all, img_base_dir, target_dir)
 puts "#{backup_actions.size} to actually backup"
 
-backup_actions.each do |a|
-  a.start
-  while !a.finished?
-    sleep 0.1
-  end
-end
-
+runJobs(backup_actions)
