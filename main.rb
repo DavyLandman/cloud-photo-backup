@@ -31,10 +31,9 @@ class BackupJob
   end
 
   def start
-    puts "From #{@original} to #{@target}"
     dir = File.dirname(@target)
     FileUtils.mkpath(dir)  unless File.directory?(dir)
-    @running ||= IO.popen("convert -resize 1800x1800 \"#{@original}\" \"#{@target}\"")
+    @running ||= IO.popen("convert -interlace Plane -quality 90 -resize 1800x1800 \"#{@original}\" \"#{@target}\"")
   end
 
   def finished?
@@ -49,14 +48,12 @@ target_dir = "output/"
 
 all = getImages(img_base_dir)
 backup_actions = createJobs(all, img_base_dir, target_dir)
+puts "#{backup_actions.size} to actually backup"
 
 backup_actions.each do |a|
   a.start
-  puts "waiting for it to finish"
   while !a.finished?
     sleep 0.1
-    puts "waiting"
   end
 end
 
-puts "#{backup_actions.size} to actually backup"
