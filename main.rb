@@ -45,7 +45,9 @@ end
 
 def runJobs(jobs, split = 4)
   queue = Queue.new
+  completed = Queue.new
   jobs.each { |j| queue.push j }
+
 
   threads = []
 
@@ -63,10 +65,24 @@ def runJobs(jobs, split = 4)
           while !work_unit.finished?
             sleep 0.1
           end
+          completed << true
         end
       end
       # when there is no more work, the thread will stop
     end
+  end
+
+  last = 0
+  show_progress = jobs.size / 25;
+  show_progress = 1 if show_progress == 0
+  STDOUT.sync = true
+  puts  "0%|#{(0..25).map{" "}}|100%"
+  print "   "
+  while completed.size < jobs.size 
+    step = completed.size % show_progress 
+    print "o" if step > last
+    last = step
+    sleep 0.5
   end
 
   threads.each { |t| t.join }
@@ -81,4 +97,4 @@ all = getImages(img_base_dir)
 backup_actions = createJobs(all, img_base_dir, target_dir)
 puts "#{backup_actions.size} to actually backup"
 
-runJobs(backup_actions)
+runJobs(backup_actions)  if backup_actions.size > 0
