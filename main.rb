@@ -1,6 +1,8 @@
+#!/usr/bin/env ruby
 require 'set'
 require 'fileutils'
 require 'thread'
+require 'optparse'
 
 def getImages(img_base_dir)
   puts "Checking input directory #{img_base_dir} for images to backup"
@@ -9,7 +11,7 @@ def getImages(img_base_dir)
   return all_images
 end
 
-def createJobs(all, img_base_dir, target_dir)
+def createJobs(all, size, img_base_dir, target_dir)
   backup_actions = Set.new
 
   all.each do |current_image|
@@ -17,7 +19,7 @@ def createJobs(all, img_base_dir, target_dir)
     target_filename += ".jpg"  unless /\.(jpg|jpeg)/.match(File.extname(target_filename).downcase)
        
     unless File.exists?(target_filename) || File.exists?(target_filename.gsub(".jpg", "-0.jpg"))
-      backup_actions << BackupJob.new(current_image, target_filename) 
+      backup_actions << BackupJob.new(current_image, target_filename, size) 
     end
   end
 
@@ -25,16 +27,16 @@ def createJobs(all, img_base_dir, target_dir)
 end
 
 class BackupJob
-  def initialize(original, target)
+  def initialize(original, target, size)
     @original = original
     @target = target
-    @running = nil
+    @size = size
   end
 
   def Run 
     dir = File.dirname(@target)
     FileUtils.mkpath(dir)  unless File.directory?(dir)
-    `convert -interlace Plane -quality 85 -resize 1800x1800 \"#{@original}\" \"#{@target}\"`
+    `convert -interlace Plane -quality 85 -resize #{@size}x#{@size} \"#{@original}\" \"#{@target}\"`
   end
 
 end
@@ -48,7 +50,7 @@ def printProgress(prog)
   print "Progress: [#{genc(progb,"=")}#{genc(50-progb," ")}] #{(100*prog).round}%\r"
 end
 
-def runJobs(jobs, split = 4)
+def runJobs(jobs, split)
   queue = Queue.new
   jobs.each { |j| queue.push j }
 
@@ -84,13 +86,46 @@ def runJobs(jobs, split = 4)
   puts "\nFinished"
 end
 
-#img_base_dir = "/Users/davy/Pictures/"
-#target_dir = "/Users/davy/Dropbox/Pictures Backup/"
-img_base_dir = "input/"
-target_dir = "output/"
+
+options = {}
+
+optparse = OptionParser.new do|opts|
+  opts.banner = "Usage: backup-pictures.rb [options] source-folder target-folder"
+
+  options[:cores] = 4 
+  opts.on( '-c', '--cores NUM', Integer, 'Number of cpu cores to use (default 4)' ) do |c|
+    options[:cores] = c
+  end
+
+  options[:size] = 152
+  opts.on( '-s', '--size MM', Integer, 'Longest edge size in milimeters (default 152mm for 10x15 format)' ) do |c|
+    options[:size] = c
+  end
+
+  opts.on( '-h', '--help', 'Display this screen' ) do
+    puts opts
+    exit
+  end
+end
+
+optparse.parse! # remove options
+
+if ARGV.size != 2
+  puts "Please provide source and target folder"
+  puts optparse.help
+  exit
+end
+ARGV.each { |d| optparse.abort("#{d} is not a valid directory")  if not File.directory?(d)}
+img_base_dir = ARGV[0]
+target_dir = ARGV[1]
+optparse.abort("I have no write rights in #{target_dir}, fix rights or run as a different user.") if not File.writable?(target_dir)
+
+
+target_size = (((options[:size] / 25.4) * 300) /100).ceil * 100
+
 
 all = getImages(img_base_dir)
-backup_actions = createJobs(all, img_base_dir, target_dir)
+backup_actions = createJobs(all, target_size, img_base_dir, target_dir)
 puts "#{backup_actions.size} to actually backup"
 
-runJobs(backup_actions)  if backup_actions.size > 0
+runJobs(backup_actions, options[:cores])  if backup_actions.size > 0
