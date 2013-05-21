@@ -45,7 +45,7 @@ end
 
 def printProgress(prog)
   progb = (50*prog).round
-  print "#{(100*prog).round}%\t|#{genc(progb,"-")}#{genc(50-progb," ")}|\r"
+  print "Progress: [#{genc(progb,"=")}#{genc(50-progb," ")}] #{(100*prog).round}%\r"
 end
 
 def runJobs(jobs, split = 4)
@@ -54,23 +54,20 @@ def runJobs(jobs, split = 4)
 
 
   threads = []
-  progress = 0.0
+  jobs_finished = 0.0
 
   split.times do
     threads << Thread.new do
-      # loop until there are no more things to do
       until queue.empty?
         # pop with the non-blocking flag set, this raises
         # an exception if the queue is empty, in which case
         # work_unit will be set to nil
         work_unit = queue.pop(true) rescue nil
         if work_unit
-          # do work
           work_unit.Run
-          progress += 1
+          jobs_finished += 1
         end
       end
-      # when there is no more work, the thread will stop
     end
   end
 
@@ -79,7 +76,7 @@ def runJobs(jobs, split = 4)
   STDOUT.sync = true
   printProgress(0)
   until threads.map{ |t| t.join(0.1) }.all?
-    prog = (progress / jobs_size)
+    prog = (jobs_finished / jobs_size)
     printProgress(prog) if prog > last
     last = prog 
   end
