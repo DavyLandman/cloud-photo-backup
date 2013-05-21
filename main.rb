@@ -39,6 +39,14 @@ class BackupJob
 
 end
 
+def genc(amount, c)
+  "#{(0..amount-1).map{c}}"
+end
+
+def printProgress(prog)
+  progb = (50*prog).round
+  print "#{(100*prog).round}%\t|#{genc(progb,"-")}#{genc(50-progb," ")}|\r"
+end
 
 def runJobs(jobs, split = 4)
   queue = Queue.new
@@ -66,18 +74,16 @@ def runJobs(jobs, split = 4)
     end
   end
 
-  last = 0
+  last = 0.0
   jobs_size = jobs.size
-  puts  "0%|#{(0..49).map{"_"}}|100%"
   STDOUT.sync = true
-  print "   "
-  until threads.map{ |t| t.join(0.05) }.all?
-    step = (50 * (progress / jobs_size)).round
-    print (last..step-1).map{"#"} 
-    last = step
+  printProgress(0)
+  until threads.map{ |t| t.join(0.1) }.all?
+    prog = (progress / jobs_size)
+    printProgress(prog) if prog > last
+    last = prog 
   end
-
-  print (last..49).map{"#"} 
+  printProgress(1.0)
   puts "\nFinished"
 end
 
