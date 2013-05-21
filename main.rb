@@ -31,15 +31,12 @@ class BackupJob
     @running = nil
   end
 
-  def start
+  def Run 
     dir = File.dirname(@target)
     FileUtils.mkpath(dir)  unless File.directory?(dir)
-    @running ||= IO.popen("convert -interlace Plane -quality 85 -resize 1800x1800 \"#{@original}\" \"#{@target}\"")
+    `convert -interlace Plane -quality 85 -resize 1800x1800 \"#{@original}\" \"#{@target}\"`
   end
 
-  def finished?
-    IO.select([@running], nil, nil, 0.1) and @running.eof?
-  end
 end
 
 
