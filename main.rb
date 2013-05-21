@@ -50,7 +50,6 @@ def runJobs(jobs, split = 4)
 
   split.times do
     threads << Thread.new do
-      Thread.current['progress'] = 0
       # loop until there are no more things to do
       until queue.empty?
         # pop with the non-blocking flag set, this raises
@@ -59,11 +58,7 @@ def runJobs(jobs, split = 4)
         work_unit = queue.pop(true) rescue nil
         if work_unit
           # do work
-          work_unit.start
-          while !work_unit.finished?
-            sleep 0.1
-          end
-          Thread.current['progress'] += 1
+          work_unit.Run
           progress += 1
         end
       end
@@ -71,29 +66,19 @@ def runJobs(jobs, split = 4)
     end
   end
 
-  
-  threads << Thread.new do
-    last = 0
-    jobs_size = jobs.size
-    puts  "0%|#{(0..24).map{"_"}}|100%"
-    STDOUT.sync = true
-    print "   "
-    while progress <= jobs_size
-      step = (100 * (progress / jobs_size)).round / 4
-      while last < step
-        print "#"
-        last += 1
-      end
-      if last == 25
-        break
-      end
-      sleep 0.1
-    end
-    print "\n"
+  last = 0
+  jobs_size = jobs.size
+  puts  "0%|#{(0..49).map{"_"}}|100%"
+  STDOUT.sync = true
+  print "   "
+  until threads.map{ |t| t.join(0.05) }.all?
+    step = (50 * (progress / jobs_size)).round
+    print (last..step-1).map{"#"} 
+    last = step
   end
 
-  threads.each { |t| t.join }
-  puts "Finished"
+  print (last..49).map{"#"} 
+  puts "\nFinished"
 end
 
 #img_base_dir = "/Users/davy/Pictures/"
