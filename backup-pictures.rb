@@ -4,11 +4,9 @@ require 'fileutils'
 require 'thread'
 require 'optparse'
 
-def getImages(img_base_dir)
-  puts "Checking input directory #{img_base_dir} for images to backup"
-  all_images = Dir.glob("#{img_base_dir}**/*.{jpg,jpeg,png,tiff,tif,psd}", File::FNM_CASEFOLD)
-  puts "Got #{all_images.size} amount of images to progress"
-  return all_images
+
+def getImages(d)
+  Dir.glob("#{d}**/*.{jpg,jpeg,png,bmp,tiff,tif,psd}", File::FNM_CASEFOLD)
 end
 
 def createJobs(all, size, img_base_dir, target_dir)
@@ -75,7 +73,6 @@ def runJobs(jobs, split)
 
   last = 0.0
   jobs_size = jobs.size
-  STDOUT.sync = true
   printProgress(0)
   until threads.map{ |t| t.join(0.1) }.all?
     prog = (jobs_finished / jobs_size)
@@ -84,6 +81,30 @@ def runJobs(jobs, split)
   end
   printProgress(1.0)
   puts "\nFinished"
+end
+
+
+def longCalculation(message)
+  print message
+  print ": "
+  result = nil
+  t = Thread.new do
+    result = yield
+  end
+
+# print spinner
+  spinner = %w[| / - \\]
+  i = 0
+  print spinner[i % spinner.length]
+  until t.join(0.1)
+    i += 1
+    print "\b"
+    print spinner[i % spinner.length]
+  end
+  print "\b"
+  print "#{result.size}\n"
+
+  return result
 end
 
 
@@ -98,7 +119,7 @@ optparse = OptionParser.new do|opts|
   end
 
   options[:size] = 152
-  opts.on( '-s', '--size MM', Integer, 'Longest edge size in milimeters (default 152mm for 10x15 format)' ) do |c|
+  opts.on( '-s', '--size MM', Integer, 'Longest edge in milimeters (default 152mm for 10x15 format)' ) do |c|
     options[:size] = c
   end
 
@@ -124,8 +145,12 @@ optparse.abort("I have no write rights in #{target_dir}, fix rights or run as a 
 target_size = (((options[:size] / 25.4) * 300) /100).ceil * 100
 
 
-all = getImages(img_base_dir)
-backup_actions = createJobs(all, target_size, img_base_dir, target_dir)
-puts "#{backup_actions.size} to actually backup"
+STDOUT.sync = true
+all = longCalculation("Images in #{img_base_dir}") { getImages(img_base_dir) }
+backup_actions = longCalculation("Not yet in #{target_dir}") { createJobs(all, target_size, img_base_dir, target_dir) }
 
-runJobs(backup_actions, options[:cores])  if backup_actions.size > 0
+if backup_actions.size > 0
+  puts ""
+  puts "Starting backup"
+  runJobs(backup_actions, options[:cores])  
+end
