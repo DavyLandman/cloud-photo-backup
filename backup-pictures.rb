@@ -40,7 +40,7 @@ class BackupJob
 end
 
 def genc(amount, c)
-  "#{(0..amount-1).map{c}}"
+  "#{(0..amount-1).map{c}.inject{|a,e| a + e}}"
 end
 
 def printProgress(prog)
